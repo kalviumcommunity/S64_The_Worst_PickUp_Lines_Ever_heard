@@ -1,0 +1,11 @@
+{
+  "name": "s64_the_worst_pickup_lines_ever_heard",
+  "version": "1.0.0",
+  "description": "The \"Worst Pick-Up Lines Ever Heard\" project is a humorous and interactive web application where users can contribute and explore a collection of cringe-worthy pick-up lines. The platform allows users to submit their favorite awful pick-up lines, vote on the most hilariously bad ones, and sort them by popularity. The goal is to create a lighthearted space for sharing laughs while demonstrating technical skills in full-stack web development.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
