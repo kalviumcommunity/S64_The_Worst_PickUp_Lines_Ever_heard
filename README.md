@@ -1,3 +1,5 @@
+DEPLOYED LINK = https://s64-the-worst-pickup-lines-ever-heard-2.onrender.com
+
 # S64_The_Worst_PickUp_Lines_Ever_heard
 
 ## Project Idea
