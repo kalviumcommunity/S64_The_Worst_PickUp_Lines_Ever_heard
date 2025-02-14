@@ -33,3 +33,5 @@ Users can modify or delete their own submissions, ensuring control over their co
 
 
 The Render Deployment link:- https://s64-the-worst-pickup-lines-ever-heard-2.onrender.com
+
+The FrontEnd Deployment link:- s64-the-worst-pickup-lines-ever-heard.pages.dev
