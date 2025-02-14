@@ -1,0 +1,97 @@
+/* Ensure the page covers full viewport height dynamically */
+.landing-container {
+    min-height: 100vh;  /* Always at least full screen */
+    width: 100vw;       /* Ensure it stretches full width */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: #e0e0e0;
+    padding: 20px;
+    text-align: center;
+    overflow: hidden;
+  }
+  
+  /* Adjust content size dynamically */
+  .content-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 90%;  /* Responsive width */
+    width: 800px;
+    flex-grow: 1;  /* Ensures content expands dynamically */
+  }
+  
+  /* Hero Section */
+  .hero-section h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem); /* Adjusts size based on viewport */
+    font-weight: bold;
+    color: #ffcc00;
+    text-shadow: 2px 2px 10px rgba(255, 204, 0, 0.5);
+  }
+  
+  .hero-section p {
+    font-size: clamp(1rem, 2vw, 1.5rem);
+    margin-top: 10px;
+    color: #b3b3b3;
+  }
+  
+  /* Responsive Features Section */
+  .features-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Dynamic grid */
+    gap: 20px;
+    margin-top: 40px;
+    justify-content: center;
+    width: 100%;
+    max-width: 900px;
+  }
+  
+  /* Feature Cards */
+  .feature-card {
+    background: #222831;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+  
+  .feature-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.3);
+  }
+  
+  /* Icons */
+  .icon {
+    font-size: 2.5rem;
+  }
+  
+  /* Call-to-Action Button */
+  .cta-button {
+    margin-top: 30px;
+    padding: 12px 24px;
+    font-size: clamp(1rem, 2vw, 1.2rem);
+    font-weight: bold;
+    color: #1a1a2e;
+    background: #ffcc00;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s ease;
+  }
+  
+  .cta-button:hover {
+    background: #ffaa00;
+    transform: scale(1.1);
+  }
+  
+  /* Footer */
+  .footer {
+    margin-top: auto; /* Pushes footer to the bottom dynamically */
+    font-size: clamp(0.8rem, 1vw, 1rem);
+    color: #888;
+    padding-bottom: 20px;
+  }
+  
