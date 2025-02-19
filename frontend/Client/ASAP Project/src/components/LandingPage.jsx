@@ -1,7 +1,10 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom"; // Import for navigation
 import "./LandingPage.css"; // Import external CSS
 
 const LandingPage = () => {
+  const navigate = useNavigate(); // Hook for navigation
+
   return (
     <div className="landing-container">
       <div className="content-wrapper">
@@ -48,6 +51,7 @@ const LandingPage = () => {
           className="cta-button"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
+          onClick={() => navigate("/pickup-lines")} // Navigate to Pick-Up Line Page
         >
           Get Started 🚀
         </motion.button>
