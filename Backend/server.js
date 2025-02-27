@@ -1,87 +1,61 @@
-// const express = require('express');
-// const app = express();
-
-// app.get('/Ping', (req, res) => {
-//     res.send('Pong');
-//     });
-
-// app.listen(3000, () => {
-//     console.log('Server is running on port 3000');
-//     });
-
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json()); // Middleware to parse JSON requests
+// Middleware
+app.use(express.json());
+app.use(cors());
 
 // MongoDB Connection
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("✅ MongoDB connected successfully"))
-  .catch((err) => console.log("❌ MongoDB connection error:", err));
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// Define Schema and Model
-const itemSchema = new mongoose.Schema({
-  name: String,
-  price: Number,
+// Schema & Model
+const pickUpLineSchema = new mongoose.Schema({
+  line: { type: String, required: true }, 
+  contributor: { type: String, default: "Anonymous" }, 
+  date: { type: Date, default: Date.now }
 });
 
-const Item = mongoose.model("Item", itemSchema);
+const PickUpLine = mongoose.model("PickUpLine", pickUpLineSchema);
 
-// Home Route with DB Status
-app.get("/", (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? "Connected" : "Not Connected";
-  res.json({ message: "Welcome to the ASAP Project!", databaseStatus: dbStatus });
-});
-
-// CRUD Operations
-
-// CREATE - Add a new item
-app.post("/items", async (req, res) => {
+// API: Add a pick-up line
+app.post("/pickup-lines", async (req, res) => {
   try {
-    const newItem = await Item.create(req.body);
-    res.status(201).json(newItem);
+    console.log("📥 Received:", req.body); // Debug log
+    if (!req.body.line) return res.status(400).json({ error: "Line is required" });
+
+    const newLine = await PickUpLine.create({
+      line: req.body.line,
+      contributor: req.body.contributor || "Anonymous",
+    });
+
+    console.log("✅ Saved:", newLine); // Debug log
+    res.status(201).json(newLine);
   } catch (error) {
+    console.error("❌ Error saving pick-up line:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// READ - Get all items
-app.get("/items", async (req, res) => {
+// API: Get all pick-up lines
+app.get("/pickup-lines", async (req, res) => {
   try {
-    const items = await Item.find();
-    res.json(items);
+    const lines = await PickUpLine.find().sort({ date: -1 }); // Get latest first
+    res.json(lines);
   } catch (error) {
+    console.error("❌ Error fetching pick-up lines:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// UPDATE - Modify an item by ID
-app.put("/items/:id", async (req, res) => {
-  try {
-    const updatedItem = await Item.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updatedItem) return res.status(404).json({ message: "Item not found" });
-    res.json(updatedItem);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// DELETE - Remove an item by ID
-app.delete("/items/:id", async (req, res) => {
-  try {
-    const deletedItem = await Item.findByIdAndDelete(req.params.id);
-    if (!deletedItem) return res.status(404).json({ message: "Item not found" });
-    res.json({ message: "Item deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
+// Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
