@@ -3,7 +3,7 @@ import axios from "axios";
 import "./PickUpLine.css";
 import { motion } from "framer-motion";
 
-const PickUpLine = ({ line, contributor, date }) => (
+const PickUpLine = ({ line, contributor, category, mood, date }) => (
   <motion.div
     className="pickup-container"
     initial={{ opacity: 0, y: 20 }}
@@ -13,6 +13,8 @@ const PickUpLine = ({ line, contributor, date }) => (
     <p className="pickup-text">"{line}"</p>
     <div className="pickup-footer">
       <p className="pickup-contributor">- {contributor || "Anonymous"}</p>
+      <p className="pickup-category">Category: {category || "General"}</p>
+      <p className="pickup-mood">Mood: {mood || "Neutral"}</p>
       <p className="pickup-date">{new Date(date).toLocaleDateString()}</p>
     </div>
     <div className="pickup-icon">💬</div>
@@ -23,12 +25,17 @@ const PickUpLinePage = () => {
   const [lines, setLines] = useState([]); // Stores pick-up lines
   const [newLine, setNewLine] = useState(""); // User input
   const [contributor, setContributor] = useState(""); // Contributor name
+  const [category, setCategory] = useState(""); // Category input
+  const [mood, setMood] = useState(""); // Mood input
 
   // Fetch existing pick-up lines from backend
   useEffect(() => {
     axios.get("http://localhost:3000/pickup-lines")
-      .then((response) => setLines(response.data))
-      .catch((error) => console.error("Error fetching pickup lines:", error));
+      .then((response) => {
+        console.log("📥 Data received:", response.data); // Debugging
+        setLines(response.data);
+      })
+      .catch((error) => console.error("❌ Error fetching pickup lines:", error));
   }, []);
 
   // Handle form submission
@@ -40,13 +47,18 @@ const PickUpLinePage = () => {
       const response = await axios.post("http://localhost:3000/pickup-lines", {
         line: newLine,
         contributor: contributor || "Anonymous",
+        category: category || "General",
+        mood: mood || "Neutral",
       });
 
+      console.log("✅ New Entry:", response.data); // Debugging
       setLines([response.data, ...lines]); // Add new line at the top
       setNewLine(""); // Clear input
       setContributor(""); // Clear contributor field
+      setCategory(""); // Clear category field
+      setMood(""); // Clear mood field
     } catch (error) {
-      console.error("Error submitting pick-up line:", error);
+      console.error("❌ Error submitting pick-up line:", error);
     }
   };
 
@@ -69,6 +81,18 @@ const PickUpLinePage = () => {
           placeholder="Your name (optional)"
           value={contributor}
           onChange={(e) => setContributor(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Category (e.g., Flirty, Cheesy)"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Mood (e.g., Funny, Awkward)"
+          value={mood}
+          onChange={(e) => setMood(e.target.value)}
         />
         <button type="submit">Submit</button>
       </form>
