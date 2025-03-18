@@ -2,9 +2,12 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SECRET_KEY = process.env.JWT_SECRET || "supersecretkey";
 
 // Middleware
 app.use(express.json());
@@ -13,123 +16,142 @@ app.use(cors());
 // MongoDB Connection
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("✅ MongoDB connected successfully"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
-// Schema & Model
+// User Schema & Model
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  date: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model("User", userSchema);
+
+// Pick-Up Line Schema & Model
 const pickUpLineSchema = new mongoose.Schema({
-  line: { type: String, required: true }, 
-  contributor: { type: String, default: "Anonymous" }, 
-  category: { type: String, default: "General" }, 
-  mood: { type: String, default: "Neutral" }, 
+  line: { type: String, required: true },
+  contributor: { type: String, default: "Anonymous" },
+  category: { type: String, default: "General" },
+  mood: { type: String, default: "Neutral" },
   date: { type: Date, default: Date.now }
 });
 
 const PickUpLine = mongoose.model("PickUpLine", pickUpLineSchema);
 
-// 🔄 Update old records if `category` and `mood` are missing
-const updateOldEntries = async () => {
+// Middleware for authentication
+const verifyToken = (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).json({ error: "Access Denied" });
+
   try {
-    const result = await PickUpLine.updateMany(
-      { category: { $exists: false } }, 
-      { $set: { category: "Unknown", mood: "Unknown" } }
-    );
-    console.log(`✅ Updated ${result.modifiedCount} old entries.`);
+    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
+    req.user = verified;
+    next();
   } catch (error) {
-    console.error("❌ Error updating old entries:", error);
+    res.status(400).json({ error: "Invalid Token" });
   }
 };
-updateOldEntries(); // Run once on server start
 
-// API: Add a pick-up line
-app.post("/pickup-lines", async (req, res) => {
+// User Registration
+app.post("/register", async (req, res) => {
   try {
-    console.log("📥 Received:", req.body);
+    const { username, email, password } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ error: "User already exists" });
+
+    // Hash Password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Save User
+    const newUser = new User({ username, email, password: hashedPassword });
+    await newUser.save();
+
+    res.status(201).json({ message: "User registered successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// User Login
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: "All fields are required" });
+
+    // Check user existence
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ error: "Invalid credentials" });
+
+    // Check password
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) return res.status(400).json({ error: "Invalid credentials" });
+
+    // Generate JWT Token
+    const token = jwt.sign({ _id: user._id, email: user.email }, SECRET_KEY, { expiresIn: "1h" });
+
+    res.json({ message: "Login successful", token });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Protected Route Example (Only accessible if logged in)
+app.get("/protected", verifyToken, (req, res) => {
+  res.json({ message: "This is a protected route", user: req.user });
+  console.log(req.user);
+});
+
+// API: Add a pick-up line (Protected)
+app.post("/pickup-lines", verifyToken, async (req, res) => {
+  try {
     if (!req.body.line) return res.status(400).json({ error: "Line is required" });
 
-    const newLine = await PickUpLine.create({
+    const newLine = new PickUpLine({
       line: req.body.line,
-      contributor: req.body.contributor || "Anonymous",
+      contributor: req.user.email || "Anonymous",
       category: req.body.category || "General",
       mood: req.body.mood || "Neutral",
     });
 
-    console.log("✅ Saved:", newLine);
+    await newLine.save();
     res.status(201).json(newLine);
   } catch (error) {
-    console.error("❌ Error saving pick-up line:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// API: Get all pick-up lines
+// API: Get all pick-up lines (Public)
 app.get("/pickup-lines", async (req, res) => {
   try {
     const lines = await PickUpLine.find().sort({ date: -1 });
-    console.log("📤 Sending data:", lines);
     res.json(lines);
   } catch (error) {
-    console.error("❌ Error fetching pick-up lines:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// API: Update a pick-up line
-app.put("/pickup-lines/:id", async (req, res) => {
-  try {
-    console.log("🔄 Updating line:", req.params.id, req.body);
-
-    const updatedLine = await PickUpLine.findByIdAndUpdate(
-      req.params.id,
-      { 
-        line: req.body.line,
-        contributor: req.body.contributor || "Anonymous",
-        category: req.body.category || "General",
-        mood: req.body.mood || "Neutral",
-      },
-      { new: true }
-    );
-
-    if (!updatedLine) return res.status(404).json({ error: "Pick-up line not found" });
-
-    console.log("✅ Updated:", updatedLine);
-    res.json(updatedLine);
-  } catch (error) {
-    console.error("❌ Error updating pick-up line:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// API: Delete a pick-up line
-app.delete("/pickup-lines/:id", async (req, res) => {
+// API: Delete a pick-up line (Protected)
+app.delete("/pickup-lines/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log("🗑️ Attempting to delete ID:", id);
-
-    // Check if ID is a valid MongoDB ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      console.log("❌ Invalid ObjectId format");
-      return res.status(400).json({ error: "Invalid ID format" });
-    }
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID format" });
 
     const deletedLine = await PickUpLine.findByIdAndDelete(id);
+    if (!deletedLine) return res.status(404).json({ error: "Pick-up line not found" });
 
-    if (!deletedLine) {
-      console.log("❌ No pick-up line found with this ID:", id);
-      return res.status(404).json({ error: "Pick-up line not found" });
-    }
-
-    console.log("✅ Successfully deleted:", deletedLine);
     res.json({ message: "Pick-up line deleted successfully", deletedLine });
   } catch (error) {
-    console.error("❌ Error deleting pick-up line:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-
-
 // Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
