@@ -11,13 +11,13 @@ const SECRET_KEY = process.env.JWT_SECRET || "supersecretkey";
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: "http://localhost:5173", credentials: true }));
 
 // MongoDB Connection
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .then(() => console.log("✅ MongoDB connected successfully"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // User Schema & Model
 const userSchema = new mongoose.Schema({
@@ -43,7 +43,7 @@ const PickUpLine = mongoose.model("PickUpLine", pickUpLineSchema);
 // Middleware for authentication
 const verifyToken = (req, res, next) => {
   const token = req.header("Authorization");
-  if (!token) return res.status(401).json({ error: "Access Denied" });
+  if (!token) return res.status(401).json({ error: "Access Denied. No Token Provided" });
 
   try {
     const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
@@ -76,6 +76,7 @@ app.post("/register", async (req, res) => {
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
+    console.error("Error in /register:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -99,6 +100,7 @@ app.post("/login", async (req, res) => {
 
     res.json({ message: "Login successful", token });
   } catch (error) {
+    console.error("Error in /login:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -106,13 +108,17 @@ app.post("/login", async (req, res) => {
 // Protected Route Example (Only accessible if logged in)
 app.get("/protected", verifyToken, (req, res) => {
   res.json({ message: "This is a protected route", user: req.user });
-  console.log(req.user);
 });
 
 // API: Add a pick-up line (Protected)
 app.post("/pickup-lines", verifyToken, async (req, res) => {
   try {
-    if (!req.body.line) return res.status(400).json({ error: "Line is required" });
+    console.log("Incoming request:", req.body);
+
+    if (!req.body.line) {
+      console.log("❌ Missing 'line' field");
+      return res.status(400).json({ error: "Line is required" });
+    }
 
     const newLine = new PickUpLine({
       line: req.body.line,
@@ -122,18 +128,25 @@ app.post("/pickup-lines", verifyToken, async (req, res) => {
     });
 
     await newLine.save();
+    console.log("✅ Pick-up line added:", newLine);
+
     res.status(201).json(newLine);
   } catch (error) {
+    console.error("❌ Error in /pickup-lines:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// API: Get all pick-up lines (Public)
+// API: Get all pick-up lines (Public) with sorting
 app.get("/pickup-lines", async (req, res) => {
   try {
-    const lines = await PickUpLine.find().sort({ date: -1 });
+    let sortBy = req.query.sortBy || "date";
+    let sortOrder = sortBy === "date" ? -1 : 1;
+    
+    const lines = await PickUpLine.find().sort({ [sortBy]: sortOrder });
     res.json(lines);
   } catch (error) {
+    console.error("❌ Error in GET /pickup-lines:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -142,13 +155,21 @@ app.get("/pickup-lines", async (req, res) => {
 app.delete("/pickup-lines/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: "Invalid ID format" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.log("❌ Invalid ID format:", id);
+      return res.status(400).json({ error: "Invalid ID format" });
+    }
 
     const deletedLine = await PickUpLine.findByIdAndDelete(id);
-    if (!deletedLine) return res.status(404).json({ error: "Pick-up line not found" });
+    if (!deletedLine) {
+      console.log("❌ Pick-up line not found:", id);
+      return res.status(404).json({ error: "Pick-up line not found" });
+    }
 
+    console.log("✅ Pick-up line deleted:", deletedLine);
     res.json({ message: "Pick-up line deleted successfully", deletedLine });
   } catch (error) {
+    console.error("❌ Error in DELETE /pickup-lines:", error);
     res.status(500).json({ error: error.message });
   }
 });
