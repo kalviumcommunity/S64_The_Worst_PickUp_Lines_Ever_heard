@@ -179,3 +179,49 @@ body {
 .delete-btn:hover {
   background-color: #c82333;
 }
+.pickup-sort-dropdown {
+  width: 200px;
+  padding: 10px;
+  font-size: 16px;
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2); /* Transparent white background */
+  backdrop-filter: blur(10px); /* Blurred effect */
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  outline: none;
+  appearance: none;
+  position: relative;
+  font-weight: bold;
+}
+
+/* Add a hover effect */
+.pickup-sort-dropdown:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+/* Add animation on focus */
+.pickup-sort-dropdown:focus {
+  border-color: #ffcc00;
+  box-shadow: 0 0 10px rgba(255, 204, 0, 0.6);
+}
+
+/* Dropdown container */
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Dropdown arrow styling */
+.dropdown-container::after {
+  content: "▼";
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 14px;
+  color: #fff;
+}
