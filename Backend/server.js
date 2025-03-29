@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ const SECRET_KEY = process.env.JWT_SECRET || "supersecretkey";
 // Middleware
 app.use(express.json());
 app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cookieParser());
 
 // MongoDB Connection
 mongoose
@@ -42,23 +44,19 @@ const PickUpLine = mongoose.model("PickUpLine", pickUpLineSchema);
 
 // Middleware for authentication
 const verifyToken = (req, res, next) => {
-  const authHeader = req.header("Authorization");
-
-  if (!authHeader) {
+  const token = req.cookies.token; // Get token from cookies
+  if (!token) {
     return res.status(401).json({ error: "Access Denied. No Token Provided" });
   }
 
-  const token = authHeader.replace("Bearer ", "").trim();
-
   try {
     const verified = jwt.verify(token, SECRET_KEY);
-    req.user = verified;
+    req.user = verified; // Store the decoded user info in req.user
     next();
   } catch (error) {
     return res.status(400).json({ error: "Invalid Token" });
   }
 };
-
 
 // User Registration
 app.post("/register", async (req, res) => {
@@ -73,8 +71,7 @@ app.post("/register", async (req, res) => {
     if (existingUser) return res.status(400).json({ error: "User already exists" });
 
     // Hash Password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Save User
     const newUser = new User({ username, email, password: hashedPassword });
@@ -99,9 +96,15 @@ app.post("/login", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(400).json({ error: "Invalid credentials" });
 
+    // Generate JWT Token
     const token = jwt.sign({ _id: user._id, email: user.email }, SECRET_KEY, { expiresIn: "1h" });
 
-    res.cookie("username", user.username, { httpOnly: true, secure: false, sameSite: "Strict" });
+    // Store JWT in a cookie
+    res.cookie("token", token, {
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === "production", 
+      sameSite: "Lax",
+    });
 
     res.json({ message: "Login successful", userId: user._id });
   } catch (error) {
@@ -110,34 +113,26 @@ app.post("/login", async (req, res) => {
   }
 });
 
-
-
-
-// Protected Route Example (Only accessible if logged in)
+// Protected Route (Requires authentication)
 app.get("/protected", verifyToken, (req, res) => {
   res.json({ message: "This is a protected route", user: req.user });
 });
 
-// Logout Route - Clears the cookie
+// Logout Route - Clears the JWT cookie
 app.post("/logout", (req, res) => {
-  res.clearCookie("username", {
+  res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
+    sameSite: "Lax",
   });
 
   res.json({ message: "Logged out successfully" });
 });
 
-
-
 // API: Add a pick-up line (Protected)
 app.post("/pickup-lines", verifyToken, async (req, res) => {
   try {
-    console.log("Incoming request:", req.body);
-
     if (!req.body.line) {
-      console.log("❌ Missing 'line' field");
       return res.status(400).json({ error: "Line is required" });
     }
 
@@ -149,8 +144,6 @@ app.post("/pickup-lines", verifyToken, async (req, res) => {
     });
 
     await newLine.save();
-    console.log("✅ Pick-up line added:", newLine);
-
     res.status(201).json(newLine);
   } catch (error) {
     console.error("❌ Error in /pickup-lines:", error);
@@ -158,13 +151,22 @@ app.post("/pickup-lines", verifyToken, async (req, res) => {
   }
 });
 
-// API: Get all pick-up lines (Public) with sorting
+// API: Get all pick-up lines (Public) with sorting and pagination
 app.get("/pickup-lines", async (req, res) => {
   try {
-    let sortBy = req.query.sortBy || "date";
-    let sortOrder = sortBy === "date" ? -1 : 1;
-    
-    const lines = await PickUpLine.find().sort({ [sortBy]: sortOrder });
+    const allowedSortFields = ["date", "contributor", "mood"];
+    const sortBy = allowedSortFields.includes(req.query.sortBy) ? req.query.sortBy : "date";
+    const sortOrder = req.query.order === "asc" ? 1 : -1;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const lines = await PickUpLine.find()
+      .sort({ [sortBy]: sortOrder })
+      .skip(skip)
+      .limit(limit);
+
     res.json(lines);
   } catch (error) {
     console.error("❌ Error in GET /pickup-lines:", error);
@@ -177,17 +179,14 @@ app.delete("/pickup-lines/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      console.log("❌ Invalid ID format:", id);
       return res.status(400).json({ error: "Invalid ID format" });
     }
 
     const deletedLine = await PickUpLine.findByIdAndDelete(id);
     if (!deletedLine) {
-      console.log("❌ Pick-up line not found:", id);
       return res.status(404).json({ error: "Pick-up line not found" });
     }
 
-    console.log("✅ Pick-up line deleted:", deletedLine);
     res.json({ message: "Pick-up line deleted successfully", deletedLine });
   } catch (error) {
     console.error("❌ Error in DELETE /pickup-lines:", error);
