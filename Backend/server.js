@@ -42,17 +42,23 @@ const PickUpLine = mongoose.model("PickUpLine", pickUpLineSchema);
 
 // Middleware for authentication
 const verifyToken = (req, res, next) => {
-  const token = req.header("Authorization");
-  if (!token) return res.status(401).json({ error: "Access Denied. No Token Provided" });
+  const authHeader = req.header("Authorization");
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "Access Denied. No Token Provided" });
+  }
+
+  const token = authHeader.replace("Bearer ", "").trim();
 
   try {
-    const verified = jwt.verify(token.replace("Bearer ", ""), SECRET_KEY);
+    const verified = jwt.verify(token, SECRET_KEY);
     req.user = verified;
     next();
   } catch (error) {
-    res.status(400).json({ error: "Invalid Token" });
+    return res.status(400).json({ error: "Invalid Token" });
   }
 };
+
 
 // User Registration
 app.post("/register", async (req, res) => {
@@ -87,28 +93,43 @@ app.post("/login", async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: "All fields are required" });
 
-    // Check user existence
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: "Invalid credentials" });
 
-    // Check password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(400).json({ error: "Invalid credentials" });
 
-    // Generate JWT Token
     const token = jwt.sign({ _id: user._id, email: user.email }, SECRET_KEY, { expiresIn: "1h" });
 
-    res.json({ message: "Login successful", token });
+    res.cookie("username", user.username, { httpOnly: true, secure: false, sameSite: "Strict" });
+
+    res.json({ message: "Login successful", userId: user._id });
   } catch (error) {
-    console.error("Error in /login:", error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ Login error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
+
 
 // Protected Route Example (Only accessible if logged in)
 app.get("/protected", verifyToken, (req, res) => {
   res.json({ message: "This is a protected route", user: req.user });
 });
+
+// Logout Route - Clears the cookie
+app.post("/logout", (req, res) => {
+  res.clearCookie("username", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+  });
+
+  res.json({ message: "Logged out successfully" });
+});
+
+
 
 // API: Add a pick-up line (Protected)
 app.post("/pickup-lines", verifyToken, async (req, res) => {
